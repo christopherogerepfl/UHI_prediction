@@ -5,22 +5,20 @@ import xarray as xr
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPRegressor
 from sklearn.metrics import mean_squared_error, r2_score
+import os
+import pandas as pd
+from tqdm import tqdm
 
 
-def bound_pop(temp_ds, pop_tif):
-    x_min = temp_ds.latitude.min().values.item()
-    x_max = temp_ds.latitude.max().values.item()
-    y_min = temp_ds.longitude.min().values.item()
-    y_max = temp_ds.longitude.max().values.item()
 
-    bounded_pop = pop_tif.read(1, window=rio.windows.from_bounds(y_min, x_min, y_max, x_max, transform=pop_tif.transform))
-    return bounded_pop
 
-def moving_average(a, n=3):
-    ''' Moving average of a 1D array '''
-    ret = np.cumsum(a, dtype=float)
-    ret[n:] = ret[n:] - ret[:-n]
-    return ret[n - 1:] / n
+def resample_image(image_to_resample, new_dimensions):
+    '''Given a 2D array, increase its resolution to new dimensions, with no interpolation'''
+    new_image = np.zeros(new_dimensions)
+    for i in range(new_dimensions[0]):
+        for j in range(new_dimensions[1]):
+            new_image[i,j] = image_to_resample[int(i*image_to_resample.shape[0]/new_dimensions[0]), int(j*image_to_resample.shape[1]/new_dimensions[1])]
+    return new_image
 
 def crop_and_downgrade(pop_day_tiff, pop_night_tiff, temp_city):
 
@@ -42,46 +40,74 @@ def crop_and_downgrade(pop_day_tiff, pop_night_tiff, temp_city):
     min_lon = 111320 * min_lon
     max_lon = 111320 * max_lon
 
-    # downsample the temp_city to match the cropped_pop resolution
-    temp_city = temp_city.coarsen(y=int(temp_city.y.shape[0]/cropped_pop_day.shape[0]), x=int(temp_city.x.shape[0]/cropped_pop_day.shape[1]), boundary='trim').mean()
+    return cropped_pop_day,cropped_pop_night
 
-    #reverse the y axis of the temp_city
-    temp_city = temp_city.reindex(y=temp_city.y[::-1])
 
-    return cropped_pop_day,cropped_pop_night,  temp_city
-
-def dataviz_UHI(temp_xarray, pop_night, pop_day):
-    temp_xarray.tas[0,:,:].plot(cmap = 'Spectral_r')
-    plt.title('Temperature')
-    plt.show()
-
-    cropped_pop_day,cropped_pop_night, temp_city = crop_and_downgrade(pop_day, pop_night, temp_xarray)
-    sub1, ax = plt.subplots(1,3, figsize=(15,5))
-    ax[0].imshow(cropped_pop_day, cmap='Spectral_r')
-    ax[0].set_title('Population during the day')
-    ax[1].imshow(cropped_pop_night, cmap='Spectral_r')
-    ax[1].set_title('Population during the night')
-    ax[2].imshow(temp_city[0,:,:], cmap='Spectral_r')
-    ax[2].set_title('Temperature')
-
-def compute_deltaT(temperature_ds, urban_mask_ds):
-    deltaT_ds = temperature_ds.copy()
- 
+def compute_deltaT_urban(temperature_ds, urban_mask_ds):
+    deltaT_ds = []
     for i in range(temperature_ds.time.shape[0]):
-        avg_temp_rural = temperature_ds.tas[i,:,:].where(urban_mask_ds.ruralurbanmask == 1).mean(dim=['x','y'])
-        deltaT_ds.tas[i,:,:] = deltaT_ds.tas[i,:,:] - avg_temp_rural
+        rural_avg = temperature_ds.tas[i,:,:].where(urban_mask_ds.ruralurbanmask[:,:] == 1).mean(dim=['x','y']).values.item()
+        deltaT_ds.append(temperature_ds.tas[i,:,:].values - rural_avg)
+    deltaT_ds = np.array(deltaT_ds).flatten()
     return deltaT_ds
 
-def mplReg(X_train, X_test, y_train, y_test, hidden_layer_sizes=(10,10,10), max_iter=100, verbose=True, learning_rate='constant', solver = 'adam'):
-    scaler = StandardScaler()
-    scaler.fit(X_train)
-    X_train = scaler.transform(X_train)
-    X_test = scaler.transform(X_test)
+def process_data(folder_path, pop_day, pop_night, number_of_sample_per_city):
+    '''Create a dataframe with, for each city, the temperature, the population, the wind speed, the humidity and compute the delta of
+    temperature between urban and rural areas and add it to the dataframe'''
+    city_df = pd.DataFrame(columns=['temp', 'pop', 'wind', 'hum', 'deltaT', 'hour', 'city'])
+    for city in tqdm(['Basel', 'Cologne', 'Glasgow', 'Hamburg', 'Nantes','Turin']):
+        temp_file_path = folder_path+'/tas_'+city+'_UrbClim_2011_07_v1.0.nc'
+        wind_file_path = folder_path+'/sfcWind_'+city +'_UrbClim_2011_07_v1.0.nc'
+        hum_file_path = folder_path+'/russ_'+city +'_UrbClim_2011_07_v1.0.nc'
+        rural_mask_file_path = folder_path+'/ruralurbanmask_'+city +'_UrbClim_v1.0.nc'
+        temp_file = xr.open_dataset(temp_file_path)
+        wind_file = xr.open_dataset(wind_file_path)
+        hum_file = xr.open_dataset(hum_file_path)
+        rural_mask_file = xr.open_dataset(rural_mask_file_path)
 
-    mlp = MLPRegressor(hidden_layer_sizes=hidden_layer_sizes, max_iter=max_iter, verbose=verbose, learning_rate=learning_rate, solver = solver)
-    mlp.fit(X_train, y_train)
-    predictions = mlp.predict(X_test)
+        cropped_pop_day, cropped_pop_night = crop_and_downgrade(pop_day, pop_night, temp_file)
+        pop_day_city = resample_image(cropped_pop_day, temp_file.tas[0,:,:].shape)
+        pop_night_city = resample_image(cropped_pop_night, temp_file.tas[0,:,:].shape)
+        populations = np.concatenate([np.tile(pop_night_city.flatten(),8), np.tile(pop_day_city.flatten(), 12), np.tile(pop_night_city.flatten(), 4)])
+        populations = np.tile(populations, 31)
 
-    print('MSE: ', mean_squared_error(y_test, predictions))
-    print('R2: ', r2_score(y_test, predictions))
+        day_hours = np.tile(np.arange(0,24), temp_file.x.shape[0]*temp_file.y.shape[0])
+        hours = np.tile(day_hours.reshape(temp_file.x.shape[0]*temp_file.y.shape[0], 24).flatten(order='F'), 31)
 
+        deltaT = compute_deltaT_urban(temp_file, rural_mask_file)
+
+        city = np.tile(np.array([city]), number_of_sample_per_city)
+
+        #generate random indexes to sample the data
+        indexes = np.random.randint(0, temp_file.tas.shape[0]*temp_file.tas.shape[1]*temp_file.tas.shape[2], number_of_sample_per_city)
+
+        city_df = pd.concat([city_df, pd.DataFrame({'temp': temp_file.tas.values.flatten()[indexes],
+                                                    'pop':populations[indexes], 
+                                                    'wind': wind_file.sfcWind.values.flatten()[indexes], 
+                                                    'hum': hum_file.russ.values.flatten()[indexes],
+                                                    'deltaT': deltaT[indexes],
+                                                    'hour': hours[indexes],
+                                                    'city' : city})], ignore_index=True)
+
+    return city_df
+
+def plot_avg_deltaT(folder_path):
+    fig, axs = plt.subplots(2, 5, figsize=(20, 10))
+    for i,city in tqdm(enumerate(['Alicante', 'Basel', 'Cologne', 'Glasgow', 'Hamburg', 'Nantes', 'Oslo', 'Porto', 'Turin', 'Zagreb'])):
+        temp_file_path = xr.open_dataset(folder_path+'/tas_'+city+'_UrbClim_2011_07_v1.0.nc')
+        rural_mask_file_path = xr.open_dataset(folder_path+'/ruralurbanmask_'+city +'_UrbClim_v1.0.nc')
+        pixel = np.tile(np.arange(0, temp_file_path.tas.shape[1]*temp_file_path.tas.shape[2]), temp_file_path.tas.shape[0])
+        deltaT = compute_deltaT_urban(temp_file_path, rural_mask_file_path)
+        df = pd.DataFrame({'deltaT': deltaT, 'pixel': pixel})
+        df_mean_dt = df.groupby('pixel').mean()
+        df_mean_dt_values = df_mean_dt.deltaT.values.reshape(temp_file_path.tas.shape[1],temp_file_path.tas.shape[2])
+        df_mean_dt_values = np.flipud(df_mean_dt_values)
+        axs[int(i/5), i%5].imshow(df_mean_dt_values, cmap='Spectral_r') 
+        axs[int(i/5), i%5].set_title(city)
+
+    #share the colorbar for all the subplots
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+    fig.colorbar(axs[0,0].imshow(df_mean_dt_values, cmap='Spectral_r'), cax=cbar_ax)
+    plt.show()
+   
