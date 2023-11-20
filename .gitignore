@@ -48,3 +48,8 @@ data/tas_Oslo_UrbClim_2011_07_v1.0.nc
 data/tas_Porto_UrbClim_2011_07_v1.0.nc
 data/tas_Turin_UrbClim_2011_07_v1.0.nc
 data/tas_Zagreb_UrbClim_2011_07_v1.0.nc
+elevation/eea_r_4326_1_km_elevation-map-europe_p_2004_v01_r00/elevationeurope1x1_reproj.tif
+elevation/eea_r_4326_1_km_elevation-map-europe_p_2004_v01_r00/elevationeurope1x1_reproj2.tif
+elevation/eea_r_4326_1_km_elevation-map-europe_p_2004_v01_r00/elevationeurope1x1.prj
+elevation/eea_r_4326_1_km_elevation-map-europe_p_2004_v01_r00/elevationeurope1x1.tif
+elevation/eea_r_4326_1_km_elevation-map-europe_p_2004_v01_r00/cafa8ccf-d4d1-4b03-bc4e-681aae516730.xml

@@ -11,7 +11,6 @@ from tqdm import tqdm
 
 
 
-
 def resample_image(image_to_resample, new_dimensions):
     '''Given a 2D array, increase its resolution to new dimensions, with no interpolation'''
     new_image = np.zeros(new_dimensions)
@@ -42,6 +41,17 @@ def crop_and_downgrade(pop_day_tiff, pop_night_tiff, temp_city):
 
     return cropped_pop_day,cropped_pop_night
 
+def crop_image(image_to_crop, temp_city):
+    min_lon = temp_city.longitude.min().values.item()
+    max_lon = temp_city.longitude.max().values.item()
+    min_lat = temp_city.latitude.min().values.item()
+    max_lat = temp_city.latitude.max().values.item()
+
+    # crop the tiff with the city bounds
+    cropped_image = image_to_crop.read(1, window=rio.windows.from_bounds(min_lon, min_lat, max_lon, max_lat, transform=image_to_crop.transform))
+
+    return cropped_image
+
 
 def compute_deltaT_urban(temperature_ds, urban_mask_ds):
     deltaT_ds = []
@@ -51,7 +61,7 @@ def compute_deltaT_urban(temperature_ds, urban_mask_ds):
     deltaT_ds = np.array(deltaT_ds).flatten()
     return deltaT_ds
 
-def process_data(folder_path, pop_day, pop_night, number_of_sample_per_city):
+def process_data(folder_path, pop_day, pop_night, elevation, number_of_sample_per_city):
     '''Create a dataframe with, for each city, the temperature, the population, the wind speed, the humidity and compute the delta of
     temperature between urban and rural areas and add it to the dataframe'''
     city_df = pd.DataFrame(columns=['temp', 'pop', 'wind', 'hum', 'deltaT', 'hour', 'city'])
@@ -65,9 +75,16 @@ def process_data(folder_path, pop_day, pop_night, number_of_sample_per_city):
         hum_file = xr.open_dataset(hum_file_path)
         rural_mask_file = xr.open_dataset(rural_mask_file_path)
 
+        
         cropped_pop_day, cropped_pop_night = crop_and_downgrade(pop_day, pop_night, temp_file)
+        elevation_city = crop_image(elevation, temp_file)
+
         pop_day_city = resample_image(cropped_pop_day, temp_file.tas[0,:,:].shape)
         pop_night_city = resample_image(cropped_pop_night, temp_file.tas[0,:,:].shape)
+
+        elevation_city = resample_image(elevation_city, temp_file.tas[0,:,:].shape)
+        elevation_flatten = np.tile(elevation_city.flatten(), temp_file.tas.shape[0])
+
         populations = np.concatenate([np.tile(pop_night_city.flatten(),8), np.tile(pop_day_city.flatten(), 12), np.tile(pop_night_city.flatten(), 4)])
         populations = np.tile(populations, 31)
 
@@ -75,7 +92,8 @@ def process_data(folder_path, pop_day, pop_night, number_of_sample_per_city):
         hours = np.tile(day_hours.reshape(temp_file.x.shape[0]*temp_file.y.shape[0], 24).flatten(order='F'), 31)
 
         deltaT = compute_deltaT_urban(temp_file, rural_mask_file)
-
+        rural = np.tile(rural_mask_file.ruralurbanmask.values.flatten(), temp_file.tas.shape[0])
+        print(rural.shape, deltaT.shape)
         city = np.tile(np.array([city]), number_of_sample_per_city)
 
         #generate random indexes to sample the data
@@ -87,6 +105,8 @@ def process_data(folder_path, pop_day, pop_night, number_of_sample_per_city):
                                                     'hum': hum_file.russ.values.flatten()[indexes],
                                                     'deltaT': deltaT[indexes],
                                                     'hour': hours[indexes],
+                                                    'elevation' : elevation_flatten[indexes],
+                                                    'isrural' : rural[indexes],
                                                     'city' : city})], ignore_index=True)
 
     return city_df
