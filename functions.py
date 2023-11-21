@@ -130,4 +130,55 @@ def plot_avg_deltaT(folder_path):
     cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
     fig.colorbar(axs[0,0].imshow(df_mean_dt_values, cmap='Spectral_r'), cax=cbar_ax)
     plt.show()
-   
+
+
+def process_data_city(folder_path, pop_day, pop_night, elevation, number_of_sample_per_city, city):
+    '''Create a dataframe with, for each city, the temperature, the population, the wind speed, the humidity and compute the delta of
+    temperature between urban and rural areas and add it to the dataframe'''
+    city_df = pd.DataFrame(columns=['temp', 'pop', 'wind', 'hum', 'deltaT', 'hour', 'city'])
+
+    temp_file_path = folder_path+'/tas_'+city+'_UrbClim_2011_07_v1.0.nc'
+    wind_file_path = folder_path+'/sfcWind_'+city +'_UrbClim_2011_07_v1.0.nc'
+    hum_file_path = folder_path+'/russ_'+city +'_UrbClim_2011_07_v1.0.nc'
+    rural_mask_file_path = folder_path+'/ruralurbanmask_'+city +'_UrbClim_v1.0.nc'
+    temp_file = xr.open_dataset(temp_file_path)
+    wind_file = xr.open_dataset(wind_file_path)
+    hum_file = xr.open_dataset(hum_file_path)
+    rural_mask_file = xr.open_dataset(rural_mask_file_path)
+
+
+    cropped_pop_day, cropped_pop_night = crop_and_downgrade(pop_day, pop_night, temp_file)
+    elevation_city = crop_image(elevation, temp_file)
+
+    pop_day_city = resample_image(cropped_pop_day, temp_file.tas[0,:,:].shape)
+    pop_night_city = resample_image(cropped_pop_night, temp_file.tas[0,:,:].shape)
+
+    elevation_city = resample_image(elevation_city, temp_file.tas[0,:,:].shape)
+    elevation_flatten = np.tile(elevation_city.flatten(), temp_file.tas.shape[0])
+
+    populations = np.concatenate([np.tile(pop_night_city.flatten(),8), np.tile(pop_day_city.flatten(), 12), np.tile(pop_night_city.flatten(), 4)])
+    populations = np.tile(populations, 31)
+
+    day_hours = np.tile(np.arange(0,24), temp_file.x.shape[0]*temp_file.y.shape[0])
+    hours = np.tile(day_hours.reshape(temp_file.x.shape[0]*temp_file.y.shape[0], 24).flatten(order='F'), 31)
+
+    deltaT = compute_deltaT_urban(temp_file, rural_mask_file)
+    rural = np.tile(rural_mask_file.ruralurbanmask.values.flatten(), temp_file.tas.shape[0])
+    print(rural.shape, deltaT.shape)
+    city = np.tile(np.array([city]), number_of_sample_per_city)
+
+    #generate random indexes to sample the data
+    indexes = np.random.randint(0, temp_file.tas.shape[0]*temp_file.tas.shape[1]*temp_file.tas.shape[2], number_of_sample_per_city)
+
+    city_df = pd.DataFrame({'temp': temp_file.tas.values.flatten()[indexes],
+                                                'pop':populations[indexes], 
+                                                'wind': wind_file.sfcWind.values.flatten()[indexes], 
+                                                'hum': hum_file.russ.values.flatten()[indexes],
+                                                'deltaT': deltaT[indexes],
+                                                'hour': hours[indexes],
+                                                'city' : city,
+                                                'elevation' : elevation_flatten[indexes],
+                                                'isrural' : rural[indexes]
+                                                })
+
+    return city_df
