@@ -61,11 +61,11 @@ def compute_deltaT_urban(temperature_ds, urban_mask_ds):
     deltaT_ds = np.array(deltaT_ds).flatten()
     return deltaT_ds
 
-def process_data(folder_path, pop_day, pop_night, elevation, number_of_sample_per_city):
+def process_data(folder_path, pop_day, pop_night, elevation, land_cover, number_of_sample_per_city):
     '''Create a dataframe with, for each city, the temperature, the population, the wind speed, the humidity and compute the delta of
     temperature between urban and rural areas and add it to the dataframe'''
     city_df = pd.DataFrame(columns=['temp', 'pop', 'wind', 'hum', 'deltaT', 'hour', 'city'])
-    for city in tqdm(['Basel', 'Cologne', 'Glasgow', 'Hamburg', 'Nantes','Turin']):
+    for city in tqdm(['Basel', 'Cologne', 'Glasgow', 'Hamburg', 'Nantes','Turin', 'Oslo']):
         temp_file_path = folder_path+'/tas_'+city+'_UrbClim_2011_07_v1.0.nc'
         wind_file_path = folder_path+'/sfcWind_'+city +'_UrbClim_2011_07_v1.0.nc'
         hum_file_path = folder_path+'/russ_'+city +'_UrbClim_2011_07_v1.0.nc'
@@ -78,6 +78,7 @@ def process_data(folder_path, pop_day, pop_night, elevation, number_of_sample_pe
         
         cropped_pop_day, cropped_pop_night = crop_and_downgrade(pop_day, pop_night, temp_file)
         elevation_city = crop_image(elevation, temp_file)
+        lc_city = crop_image(land_cover, temp_file)
 
         pop_day_city = resample_image(cropped_pop_day, temp_file.tas[0,:,:].shape)
         pop_night_city = resample_image(cropped_pop_night, temp_file.tas[0,:,:].shape)
@@ -85,8 +86,14 @@ def process_data(folder_path, pop_day, pop_night, elevation, number_of_sample_pe
         elevation_city = resample_image(elevation_city, temp_file.tas[0,:,:].shape)
         elevation_flatten = np.tile(elevation_city.flatten(), temp_file.tas.shape[0])
 
+        lc_city = resample_image(lc_city, temp_file.tas[0,:,:].shape)
+        lc_flatten = np.tile(lc_city.flatten(), temp_file.tas.shape[0])
+
         populations = np.concatenate([np.tile(pop_night_city.flatten(),8), np.tile(pop_day_city.flatten(), 12), np.tile(pop_night_city.flatten(), 4)])
         populations = np.tile(populations, 31)
+
+        latitude = np.tile(temp_file.latitude.values.flatten(), temp_file.tas.shape[0])
+        longitude = np.tile(temp_file.longitude.values.flatten(), temp_file.tas.shape[0])
 
         day_hours = np.tile(np.arange(0,24), temp_file.x.shape[0]*temp_file.y.shape[0])
         hours = np.tile(day_hours.reshape(temp_file.x.shape[0]*temp_file.y.shape[0], 24).flatten(order='F'), 31)
@@ -98,7 +105,6 @@ def process_data(folder_path, pop_day, pop_night, elevation, number_of_sample_pe
 
         #generate random indexes to sample the data
         indexes = np.random.randint(0, temp_file.tas.shape[0]*temp_file.tas.shape[1]*temp_file.tas.shape[2], number_of_sample_per_city)
-
         city_df = pd.concat([city_df, pd.DataFrame({'temp': temp_file.tas.values.flatten()[indexes],
                                                     'pop':populations[indexes], 
                                                     'wind': wind_file.sfcWind.values.flatten()[indexes], 
@@ -107,7 +113,10 @@ def process_data(folder_path, pop_day, pop_night, elevation, number_of_sample_pe
                                                     'hour': hours[indexes],
                                                     'elevation' : elevation_flatten[indexes],
                                                     'isrural' : rural[indexes],
-                                                    'city' : city})], ignore_index=True)
+                                                    'land cover type':lc_flatten[indexes],
+                                                    'city' : city,
+                                                    'latitude' : latitude[indexes],
+                                                    'longitude' : longitude[indexes]})])
 
     return city_df
 
@@ -132,7 +141,7 @@ def plot_avg_deltaT(folder_path):
     plt.show()
 
 
-def process_data_city(folder_path, pop_day, pop_night, elevation, number_of_sample_per_city, city):
+def process_data_city(folder_path, pop_day, pop_night, elevation, lc, number_of_sample_per_city, city):
     '''Create a dataframe with, for each city, the temperature, the population, the wind speed, the humidity and compute the delta of
     temperature between urban and rural areas and add it to the dataframe'''
     city_df = pd.DataFrame(columns=['temp', 'pop', 'wind', 'hum', 'deltaT', 'hour', 'city'])
@@ -149,12 +158,16 @@ def process_data_city(folder_path, pop_day, pop_night, elevation, number_of_samp
 
     cropped_pop_day, cropped_pop_night = crop_and_downgrade(pop_day, pop_night, temp_file)
     elevation_city = crop_image(elevation, temp_file)
+    lc_city = crop_image(lc, temp_file)
 
     pop_day_city = resample_image(cropped_pop_day, temp_file.tas[0,:,:].shape)
     pop_night_city = resample_image(cropped_pop_night, temp_file.tas[0,:,:].shape)
 
     elevation_city = resample_image(elevation_city, temp_file.tas[0,:,:].shape)
     elevation_flatten = np.tile(elevation_city.flatten(), temp_file.tas.shape[0])
+
+    lc_city = resample_image(lc_city, temp_file.tas[0,:,:].shape)
+    lc_flatten = np.tile(lc_city.flatten(), temp_file.tas.shape[0])
 
     populations = np.concatenate([np.tile(pop_night_city.flatten(),8), np.tile(pop_day_city.flatten(), 12), np.tile(pop_night_city.flatten(), 4)])
     populations = np.tile(populations, 31)
@@ -167,18 +180,43 @@ def process_data_city(folder_path, pop_day, pop_night, elevation, number_of_samp
     print(rural.shape, deltaT.shape)
     city = np.tile(np.array([city]), number_of_sample_per_city)
 
+    latitude = np.tile(temp_file.latitude.values.flatten(), temp_file.tas.shape[0])
+    longitude = np.tile(temp_file.longitude.values.flatten(), temp_file.tas.shape[0])
+
     #generate random indexes to sample the data
     indexes = np.random.randint(0, temp_file.tas.shape[0]*temp_file.tas.shape[1]*temp_file.tas.shape[2], number_of_sample_per_city)
 
     city_df = pd.DataFrame({'temp': temp_file.tas.values.flatten()[indexes],
-                                                'pop':populations[indexes], 
-                                                'wind': wind_file.sfcWind.values.flatten()[indexes], 
-                                                'hum': hum_file.russ.values.flatten()[indexes],
-                                                'deltaT': deltaT[indexes],
-                                                'hour': hours[indexes],
-                                                'city' : city,
-                                                'elevation' : elevation_flatten[indexes],
-                                                'isrural' : rural[indexes]
-                                                })
+                            'pop':populations[indexes], 
+                            'wind': wind_file.sfcWind.values.flatten()[indexes], 
+                            'hum': hum_file.russ.values.flatten()[indexes],
+                            'deltaT': deltaT[indexes],
+                            'hour': hours[indexes],
+                            'elevation' : elevation_flatten[indexes],
+                            'isrural' : rural[indexes],
+                            'land cover type':lc_flatten[indexes],
+                            'city' : city,
+                            'latitude' : latitude[indexes],
+                            'longitude' : longitude[indexes]
+                            })
 
     return city_df
+
+import mpl_scatter_density # adds projection='scatter_density'
+from matplotlib.colors import LinearSegmentedColormap, LogNorm
+
+# "Viridis-like" colormap with white background
+white_viridis = LinearSegmentedColormap.from_list('white_viridis', [
+    (0, '#ffffff'),
+    (1e-20, '#440053'),
+    (0.2, '#404388'),
+    (0.4, '#2a788e'),
+    (0.6, '#21a784'),
+    (0.8, '#78d151'),
+    (1, '#fde624'),
+], N=256)
+
+def using_mpl_scatter_density(fig, x, y):
+    ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
+    density = ax.scatter_density(x, y, cmap=white_viridis)
+    fig.colorbar(density, label='Number of points per pixel')
