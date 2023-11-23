@@ -30,6 +30,12 @@ def crop_and_downgrade(pop_day_tiff, pop_night_tiff, temp_city):
     cropped_pop_day = pop_day_tiff.read(1, window=rio.windows.from_bounds(min_lon, min_lat, max_lon, max_lat, transform=pop_day_tiff.transform))
     cropped_pop_night = pop_night_tiff.read(1, window=rio.windows.from_bounds(min_lon, min_lat, max_lon, max_lat, transform=pop_night_tiff.transform))
 
+    #downgrade the resolution of the temp_city to the resolution of the population tiff
+    dim1 = cropped_pop_day.shape[0]
+    dim2 = cropped_pop_day.shape[1]
+
+    temp_city_down = temp_city.coarsen(x=int(temp_city.x.shape[0]/dim2), y=int(temp_city.y.shape[0]/dim1), boundary='trim').mean()
+
 
     #convert the latitude in meters
     min_lat = 110574 * min_lat
@@ -39,7 +45,7 @@ def crop_and_downgrade(pop_day_tiff, pop_night_tiff, temp_city):
     min_lon = 111320 * min_lon
     max_lon = 111320 * max_lon
 
-    return cropped_pop_day,cropped_pop_night
+    return cropped_pop_day,cropped_pop_night, temp_city_down
 
 def crop_image(image_to_crop, temp_city):
     min_lon = temp_city.longitude.min().values.item()
