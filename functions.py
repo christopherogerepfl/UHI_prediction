@@ -19,7 +19,7 @@ def resample_image(image_to_resample, new_dimensions):
             new_image[i,j] = image_to_resample[int(i*image_to_resample.shape[0]/new_dimensions[0]), int(j*image_to_resample.shape[1]/new_dimensions[1])]
     return new_image
 
-def crop_and_downgrade(pop_day_tiff, pop_night_tiff, temp_city):
+def crop_and_downgrade(pop_day_tiff=None, pop_night_tiff=None, temp_city=None):
 
     min_lon = temp_city.longitude.min().values.item()
     max_lon = temp_city.longitude.max().values.item()
@@ -28,7 +28,7 @@ def crop_and_downgrade(pop_day_tiff, pop_night_tiff, temp_city):
 
     # crop the tiff with the city bounds
     cropped_pop_day = pop_day_tiff.read(1, window=rio.windows.from_bounds(min_lon, min_lat, max_lon, max_lat, transform=pop_day_tiff.transform))
-    cropped_pop_night = pop_night_tiff.read(1, window=rio.windows.from_bounds(min_lon, min_lat, max_lon, max_lat, transform=pop_night_tiff.transform))
+    #cropped_pop_night = pop_night_tiff.read(1, window=rio.windows.from_bounds(min_lon, min_lat, max_lon, max_lat, transform=pop_night_tiff.transform))
 
     #downgrade the resolution of the temp_city to the resolution of the population tiff
     dim1 = cropped_pop_day.shape[0]
@@ -45,7 +45,7 @@ def crop_and_downgrade(pop_day_tiff, pop_night_tiff, temp_city):
     min_lon = 111320 * min_lon
     max_lon = 111320 * max_lon
 
-    return cropped_pop_day,cropped_pop_night, temp_city_down
+    return cropped_pop_day, temp_city_down
 
 def crop_image(image_to_crop, temp_city):
     min_lon = temp_city.longitude.min().values.item()
