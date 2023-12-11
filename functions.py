@@ -57,7 +57,6 @@ def crop_image(image_to_crop, temp_city):
 
     # crop the tiff with the city bounds
     cropped_image = image_to_crop.read(1, window=rio.windows.from_bounds(min_lon, min_lat, max_lon, max_lat, transform=image_to_crop.transform))
-
     return cropped_image
 
 
