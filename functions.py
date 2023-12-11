@@ -8,6 +8,8 @@ from sklearn.metrics import mean_squared_error, r2_score
 import os
 import pandas as pd
 from tqdm import tqdm
+import mpl_scatter_density # adds projection='scatter_density'
+from matplotlib.colors import LinearSegmentedColormap, LogNorm
 
 
 
@@ -59,64 +61,67 @@ def compute_deltaT_urban(temperature_ds, urban_mask_ds):
     deltaT_ds = np.array(deltaT_ds).flatten()
     return deltaT_ds
 
-def process_data(folder_path, pop_day, pop_night, elevation, land_cover, number_of_sample_per_city):
+def process_data(pop_day, pop_night, elevation, land_cover, number_of_sample_per_city, cities):
     '''Create a dataframe with, for each city, the temperature, the population, the wind speed, the humidity and compute the delta of
     temperature between urban and rural areas and add it to the dataframe'''
-    city_df = pd.DataFrame(columns=['temp', 'pop', 'wind', 'hum', 'deltaT', 'hour', 'city'])
-    for city in tqdm(['Basel', 'Cologne', 'Glasgow', 'Hamburg', 'Nantes','Turin', 'Oslo']):
-        temp_file_path = folder_path+'/tas_'+city+'_UrbClim_2011_07_v1.0.nc'
-        wind_file_path = folder_path+'/sfcWind_'+city +'_UrbClim_2011_07_v1.0.nc'
-        hum_file_path = folder_path+'/russ_'+city +'_UrbClim_2011_07_v1.0.nc'
-        rural_mask_file_path = folder_path+'/ruralurbanmask_'+city +'_UrbClim_v1.0.nc'
-        temp_file = xr.open_dataset(temp_file_path)
-        wind_file = xr.open_dataset(wind_file_path)
-        hum_file = xr.open_dataset(hum_file_path)
-        rural_mask_file = xr.open_dataset(rural_mask_file_path)
+    city_df = pd.DataFrame(columns=['temp', 'pop', 'wind', 'hum', 'deltaT', 'hour', 'elevation', 'city', 'landcover'])
+    for city in tqdm(cities):
+        for month in range(1,13):
+            #Open the datasets
+            temp_file_path = 'data/'+str.lower(city)+'_data'+'/tas_'+city+'_UrbClim_2011_'+'0'+str(month)+'_v1.0.nc'
+            wind_file_path = 'data/'+str.lower(city)+'_data'+'/sfcWind_'+city +'_UrbClim_2011_'+'0'+str(month)+'_v1.0.nc'
+            hum_file_path = 'data/'+str.lower(city)+'_data'+'/russ_'+city +'_UrbClim_2011_'+'0'+str(month)+'_v1.0.nc'
+            rural_mask_file_path = 'data/'+str.lower(city)+'_data'+'/ruralurbanmask_'+city +'_UrbClim_v1.0.nc'
+            landseamask_file_path = 'data/'+str.lower(city)+'_data'+'/landseamask_'+city+'_UrbClim_v1.0.nc'
 
-        
-        cropped_pop_day, cropped_pop_night = crop_and_downgrade(pop_day, pop_night, temp_file)
-        elevation_city = crop_image(elevation, temp_file)
-        lc_city = crop_image(land_cover, temp_file)
+            rural_mask_file = xr.open_dataset(rural_mask_file_path, )
+            landseamask_file = xr.open_dataset(landseamask_file_path)
+            temp_file = xr.open_dataset(temp_file_path)
+            wind_file = xr.open_dataset(wind_file_path)
+            hum_file = xr.open_dataset(hum_file_path)
 
-        pop_day_city = resample_image(cropped_pop_day, temp_file.tas[0,:,:].shape)
-        pop_night_city = resample_image(cropped_pop_night, temp_file.tas[0,:,:].shape)
+            #create a random mask to select the pixels to sample using latitude and longitude
+            
+            cropped_pop_day, cropped_pop_night = crop_and_downgrade(pop_day, pop_night, temp_file)
+            elevation_city = crop_image(elevation, temp_file)
+            lc_city = crop_image(land_cover, temp_file)
 
-        elevation_city = resample_image(elevation_city, temp_file.tas[0,:,:].shape)
-        elevation_flatten = np.tile(elevation_city.flatten(), temp_file.tas.shape[0])
+            pop_day_city = resample_image(cropped_pop_day, temp_file.tas[0,:,:].shape)
+            pop_night_city = resample_image(cropped_pop_night, temp_file.tas[0,:,:].shape)
 
-        lc_city = resample_image(lc_city, temp_file.tas[0,:,:].shape)
-        lc_flatten = np.tile(lc_city.flatten(), temp_file.tas.shape[0])
+            elevation_city = resample_image(elevation_city, temp_file.tas[0,:,:].shape)
+            elevation_flatten = np.tile(elevation_city.flatten(), temp_file.tas.shape[0])
 
-        populations = np.concatenate([np.tile(pop_night_city.flatten(),8), np.tile(pop_day_city.flatten(), 12), np.tile(pop_night_city.flatten(), 4)])
-        populations = np.tile(populations, 31)
+            lc_city = resample_image(lc_city, temp_file.tas[0,:,:].shape)
+            lc_flatten = np.tile(lc_city.flatten(), temp_file.tas.shape[0])
 
-        latitude = np.tile(temp_file.latitude.values.flatten(), temp_file.tas.shape[0])
-        longitude = np.tile(temp_file.longitude.values.flatten(), temp_file.tas.shape[0])
+            populations = np.concatenate([np.tile(pop_night_city.flatten(),8), np.tile(pop_day_city.flatten(), 12), np.tile(pop_night_city.flatten(), 4)])
+            populations = np.tile(populations, 31)
 
-        day_hours = np.tile(np.arange(0,24), temp_file.x.shape[0]*temp_file.y.shape[0])
-        hours = np.tile(day_hours.reshape(temp_file.x.shape[0]*temp_file.y.shape[0], 24).flatten(order='F'), 31)
+            latitude = np.tile(temp_file.latitude.values.flatten(), temp_file.tas.shape[0])
+            longitude = np.tile(temp_file.longitude.values.flatten(), temp_file.tas.shape[0])
 
-        deltaT = compute_deltaT_urban(temp_file, rural_mask_file)
-        rural = np.tile(rural_mask_file.ruralurbanmask.values.flatten(), temp_file.tas.shape[0])
-        print(rural.shape, deltaT.shape)
-        city = np.tile(np.array([city]), number_of_sample_per_city)
+            day_hours = np.tile(np.arange(0,24), temp_file.x.shape[0]*temp_file.y.shape[0])
+            hours = np.tile(day_hours.reshape(temp_file.x.shape[0]*temp_file.y.shape[0], 24).flatten(order='F'), 31)
 
-        #generate random indexes to sample the data
-        indexes = np.random.randint(0, temp_file.tas.shape[0]*temp_file.tas.shape[1]*temp_file.tas.shape[2], number_of_sample_per_city)
-        city_df = pd.concat([city_df, pd.DataFrame({'temp': temp_file.tas.values.flatten()[indexes],
-                                                    'pop':populations[indexes], 
-                                                    'wind': wind_file.sfcWind.values.flatten()[indexes], 
-                                                    'hum': hum_file.russ.values.flatten()[indexes],
-                                                    'deltaT': deltaT[indexes],
-                                                    'hour': hours[indexes],
-                                                    'elevation' : elevation_flatten[indexes],
-                                                    'isrural' : rural[indexes],
-                                                    'land cover type':lc_flatten[indexes],
-                                                    'city' : city,
-                                                    'latitude' : latitude[indexes],
-                                                    'longitude' : longitude[indexes]})])
+            deltaT = compute_deltaT_urban(temp_file, rural_mask_file)
+            rural = np.tile(rural_mask_file.ruralurbanmask.values.flatten(), temp_file.tas.shape[0])
+            print(rural.shape, deltaT.shape)
+            city = np.tile(np.array([city]), number_of_sample_per_city)
 
-    return city_df
+            #generate random indexes to sample the data
+            indexes = np.random.randint(0, temp_file.tas.shape[0]*temp_file.tas.shape[1]*temp_file.tas.shape[2], number_of_sample_per_city)
+            city_df = pd.concat([city_df, pd.DataFrame({'temp': temp_file.tas.values.flatten()[indexes],
+                                                        'pop':populations[indexes], 
+                                                        'wind': wind_file.sfcWind.values.flatten()[indexes], 
+                                                        'hum': hum_file.russ.values.flatten()[indexes],
+                                                        'deltaT': deltaT[indexes],
+                                                        'hour': hours[indexes],
+                                                        'elevation' : elevation_flatten[indexes],
+                                                        'land cover type':lc_flatten[indexes],
+                                                        'city' : city})])
+
+        return city_df
 
 def plot_avg_deltaT(folder_path):
     fig, axs = plt.subplots(2, 5, figsize=(20, 10))
@@ -200,8 +205,7 @@ def process_data_city(folder_path, pop_day, pop_night, elevation, lc, number_of_
 
     return city_df
 
-import mpl_scatter_density # adds projection='scatter_density'
-from matplotlib.colors import LinearSegmentedColormap, LogNorm
+
 
 # "Viridis-like" colormap with white background
 white_viridis = LinearSegmentedColormap.from_list('white_viridis', [
