@@ -11,13 +11,6 @@ from tqdm import tqdm
 
 
 
-def resample_image(image_to_resample, new_dimensions):
-    '''Given a 2D array, increase its resolution to new dimensions, with no interpolation'''
-    new_image = np.zeros(new_dimensions)
-    for i in range(new_dimensions[0]):
-        for j in range(new_dimensions[1]):
-            new_image[i,j] = image_to_resample[int(i*image_to_resample.shape[0]/new_dimensions[0]), int(j*image_to_resample.shape[1]/new_dimensions[1])]
-    return new_image
 
 def crop_and_downgrade(pop_day_tiff=None, pop_night_tiff=None, temp_city=None):
 
@@ -220,6 +213,16 @@ white_viridis = LinearSegmentedColormap.from_list('white_viridis', [
     (0.8, '#78d151'),
     (1, '#fde624'),
 ], N=256)
+
+
+def resample_image(image_to_resample, new_dimensions):
+    '''Given a 2D array, increase its resolution to new dimensions, with no interpolation'''
+    new_image = np.zeros(new_dimensions)
+    for i in range(new_dimensions[0]):
+        for j in range(new_dimensions[1]):
+            new_image[i,j] = image_to_resample[int(i*image_to_resample.shape[0]/new_dimensions[0]), int(j*image_to_resample.shape[1]/new_dimensions[1])]
+    return new_image
+
 
 def using_mpl_scatter_density(fig, x, y):
     ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
