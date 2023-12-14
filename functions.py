@@ -23,7 +23,7 @@ def crop_and_downgrade(pop_day_tiff=None, pop_night_tiff=None, temp_city=None):
 
     # crop the tiff with the city bounds
     cropped_pop_day = pop_day_tiff.read(1, window=rio.windows.from_bounds(min_lon, min_lat, max_lon, max_lat, transform=pop_day_tiff.transform))
-    #cropped_pop_night = pop_night_tiff.read(1, window=rio.windows.from_bounds(min_lon, min_lat, max_lon, max_lat, transform=pop_night_tiff.transform))
+    cropped_pop_night = pop_night_tiff.read(1, window=rio.windows.from_bounds(min_lon, min_lat, max_lon, max_lat, transform=pop_night_tiff.transform))
 
     #downgrade the resolution of the temp_city to the resolution of the population tiff
     dim1 = cropped_pop_day.shape[0]
@@ -40,7 +40,7 @@ def crop_and_downgrade(pop_day_tiff=None, pop_night_tiff=None, temp_city=None):
     min_lon = 111320 * min_lon
     max_lon = 111320 * max_lon
 
-    return cropped_pop_day, temp_city_down
+    return cropped_pop_day, cropped_pop_night, temp_city_down
 
 def crop_image(image_to_crop, temp_city):
     min_lon = temp_city.longitude.min().values.item()
@@ -180,7 +180,7 @@ def process_data_city(folder_path, pop_day, pop_night, elevation, lc, number_of_
 
     deltaT = compute_deltaT_urban(temp_file, rural_mask_file)
     rural = np.tile(rural_mask_file.ruralurbanmask.values.flatten(), temp_file.tas.shape[0])
-    print(rural.shape, deltaT.shape)
+    #print(rural.shape, deltaT.shape)
     city = np.tile(np.array([city]), number_of_sample_per_city)
 
     latitude = np.tile(temp_file.latitude.values.flatten(), temp_file.tas.shape[0])
