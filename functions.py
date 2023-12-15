@@ -216,6 +216,7 @@ def process_data_city(folder_path, pop_day, pop_night, elevation, lc, number_of_
     deltaT = compute_deltaT_urban(temp_file, rural_mask_file)
     rural = np.tile(rural_mask_file.ruralurbanmask.values.flatten(), temp_file.tas.shape[0])
     #print(rural.shape, deltaT.shape)
+    #print(rural.shape, deltaT.shape)
     city = np.tile(np.array([city]), number_of_sample_per_city)
 
     latitude = np.tile(temp_file.latitude.values.flatten(), temp_file.tas.shape[0])
@@ -252,6 +253,16 @@ white_viridis = LinearSegmentedColormap.from_list('white_viridis', [
     (0.8, '#78d151'),
     (1, '#fde624'),
 ], N=256)
+
+
+def resample_image(image_to_resample, new_dimensions):
+    '''Given a 2D array, increase its resolution to new dimensions, with no interpolation'''
+    new_image = np.zeros(new_dimensions)
+    for i in range(new_dimensions[0]):
+        for j in range(new_dimensions[1]):
+            new_image[i,j] = image_to_resample[int(i*image_to_resample.shape[0]/new_dimensions[0]), int(j*image_to_resample.shape[1]/new_dimensions[1])]
+    return new_image
+
 
 
 def resample_image(image_to_resample, new_dimensions):
