@@ -44,6 +44,7 @@ def crop_and_downgrade(pop_day_tiff=None, pop_night_tiff=None, temp_city=None):
     return cropped_pop_day, cropped_pop_night
 
 def crop_image(image_to_crop, temp_city):
+
     min_lon = temp_city.longitude.min().values.item()
     max_lon = temp_city.longitude.max().values.item()
     min_lat = temp_city.latitude.min().values.item()
@@ -89,15 +90,15 @@ def process_data(elevation, land_cover, NDVI,number_of_sample_per_hour=10000, ci
         NDVI_clean = NDVI_masked.NDVI.values[0,:,:]
 
 
-        NDVI_resampled = resample_image(NDVI_clean, temp_file.tas[0,:,:].shape)
+        NDVI_resampled = resample_image(NDVI_clean, temp_file.tas[0,:,:].shape, interpolation)
         NDVI_flatten = np.tile(NDVI_resampled.flatten(), temp_file.tas.shape[0])
 
         
 
-        elevation_city = resample_image(elevation_city, temp_file.tas[0,:,:].shape)
+        elevation_city = resample_image(elevation_city, temp_file.tas[0,:,:].shape, interpolation)
         elevation_flatten = np.tile(elevation_city.flatten(), temp_file.tas.shape[0])
 
-        lc_city = resample_image(lc_city, temp_file.tas[0,:,:].shape)
+        lc_city = resample_image(lc_city, temp_file.tas[0,:,:].shape, interpolation)
         lc_flatten = np.tile(lc_city.flatten(), temp_file.tas.shape[0]) 
 
         for month in range(1,13):
@@ -120,8 +121,8 @@ def process_data(elevation, land_cover, NDVI,number_of_sample_per_hour=10000, ci
             pop_night = rio.open('data_population_night\ENACT_POP_N'+str(month).zfill(2)+'2011_EU28_R2020A_4326_30ss_V1_0.tif')
             cropped_pop_day, cropped_pop_night = crop_and_downgrade(pop_day, pop_night, temp_file)
 
-            pop_day_city = resample_image(cropped_pop_day, temp_file.tas[0,:,:].shape)
-            pop_night_city = resample_image(cropped_pop_night, temp_file.tas[0,:,:].shape)
+            pop_day_city = resample_image(cropped_pop_day, temp_file.tas[0,:,:].shape, interpolation)
+            pop_night_city = resample_image(cropped_pop_night, temp_file.tas[0,:,:].shape, interpolation)
 
             populations = np.concatenate([np.tile(pop_night_city.flatten(),8), np.tile(pop_day_city.flatten(), 12), np.tile(pop_night_city.flatten(), 4)])
             populations = np.tile(populations, 31)
@@ -264,13 +265,17 @@ def resample_image(image_to_resample, new_dimensions):
     return new_image
 
 
+import scipy.ndimage
 
-def resample_image(image_to_resample, new_dimensions):
-    '''Given a 2D array, increase its resolution to new dimensions, with no interpolation'''
-    new_image = np.zeros(new_dimensions)
-    for i in range(new_dimensions[0]):
-        for j in range(new_dimensions[1]):
-            new_image[i,j] = image_to_resample[int(i*image_to_resample.shape[0]/new_dimensions[0]), int(j*image_to_resample.shape[1]/new_dimensions[1])]
+def resample_image(image_to_resample, new_dimensions, interpolation):
+    '''Given a 2D array, increase its resolution to new dimensions, with (or not) interpolation'''
+    if interpolation:
+        new_image = scipy.ndimage.zoom(image_to_resample, (new_dimensions[0]/image_to_resample.shape[0], new_dimensions[1]/image_to_resample.shape[1]))
+    else:
+        new_image = np.zeros(new_dimensions)
+        for i in range(new_dimensions[0]):
+            for j in range(new_dimensions[1]):
+                new_image[i,j] = image_to_resample[int(i*image_to_resample.shape[0]/new_dimensions[0]), int(j*image_to_resample.shape[1]/new_dimensions[1])]
     return new_image
 
 
@@ -278,3 +283,143 @@ def using_mpl_scatter_density(fig, x, y):
     ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
     density = ax.scatter_density(x, y, cmap=white_viridis)
     fig.colorbar(density, label='Number of points per pixel')
+
+
+def visualization_prediction(city, hour, model, month, quantiles):
+
+    if city not in ['Amsterdam', 'Madrid', 'Stockholm', 'Lyon', 'Vienna']:
+        raise ValueError('City not in the list\n Please choose between Amsterdam, Madrid, Stockholm, Lyon, Vienna')
+
+    if month not in range(1,13):
+        raise ValueError('Month not in the list\n Please choose a month between 1 and 12')
+    
+    month = str(month).zfill(2)
+    path_city = os.path.join('data_cities', city.lower()+r'_data')
+    russ_madrid = xr.open_dataset(path_city+r'\russ_'+city+'_UrbClim_2011_'+month+'_v1.0.nc')
+    if hour not in range(0,russ_madrid.time.shape[0]):
+        raise ValueError('Hour not in the list\n Please choose an hour between 0 and {}'.format(russ_madrid.time.shape[0]-1))
+        
+    ws_madrid = xr.open_dataset(path_city+r'\sfcWind_'+city+'_UrbClim_2011_'+month+'_v1.0.nc')
+    urban_mask_m = xr.open_dataset(path_city+r'\ruralurbanmask_'+city+'_UrbClim_v1.0.nc')
+    land_sea_madrid = xr.open_dataset(path_city+r'\landseamask_'+city+'_UrbClim_v1.0.nc')
+
+    temp_madrid = xr.open_dataset(path_city+r'\tas_'+city+'_UrbClim_2011_'+month+'_v1.0.nc')
+
+    min_lon = temp_madrid.longitude.min().values
+    max_lon = temp_madrid.longitude.max().values
+    min_lat = temp_madrid.latitude.min().values
+    max_lat = temp_madrid.latitude.max().values
+
+    pop_day_m = rio.open(r'data_population_day\ENACT_POP_D'+month+'2011_EU28_R2020A_4326_30ss_V1_0.tif')
+    pop_night_m = rio.open(r'data_population_night\ENACT_POP_N'+month+'2011_EU28_R2020A_4326_30ss_V1_0.tif')
+
+    elevation = rio.open(r'elevation\elevation_merged.tif')
+    land_cover = rio.open(r'MCD12Q1.061_LC_Prop1_doy2011001_aid0001.tif')
+    NDVI = xr.open_dataset(r'NDVI\c_gls_NDVI_201406110000_GLOBE_PROBAV_V2.2.1.nc')
+
+    elevation_m = crop_image(elevation, temp_madrid)
+    land_cover_m = crop_image(land_cover, temp_madrid)
+    pop_day_m = crop_image(pop_day_m, temp_madrid)
+    pop_night_m = crop_image(pop_night_m, temp_madrid)
+
+    NDVI_masked = NDVI.sel(lon=slice(min_lon,max_lon),lat=slice(max_lat,min_lat))
+    NDVI_m = NDVI_masked.NDVI.values[0,:,:]
+
+    elevation_m = resample_image(elevation_m, temp_madrid.tas[0,:,:].shape, interpolation = True)
+    land_cover_m = resample_image(land_cover_m, temp_madrid.tas[0,:,:].shape, interpolation = True)
+    NDVI_m = resample_image(NDVI_m, temp_madrid.tas[0,:,:].shape, interpolation = True)
+    pop_day_m = resample_image(pop_day_m, temp_madrid.tas[0,:,:].shape, interpolation = True)
+    pop_night_m = resample_image(pop_night_m, temp_madrid.tas[0,:,:].shape, interpolation = True)
+    latitudes = {'Amsterdam' : 52.377956, 'Madrid' : 40.416775, 'Stockholm' : 59.329323, 'Lyon' : 45.764043, 'Vienna' : 48.208174}
+    deltaT = compute_deltaT_urban(temp_madrid, urban_mask_m, hour)
+
+    shape_city = len(russ_madrid.x.values)
+
+    madrid_df = pd.DataFrame(
+        {'pop': pop_day_m.flatten(),
+        'elevation': elevation_m.flatten(),
+        'land cover type': land_cover_m.flatten(),
+        'NDVI': NDVI_m.flatten(),
+        'temp': temp_madrid.tas[hour,:,:].values.flatten(),
+        'hum': russ_madrid.russ[hour,:,:].values.flatten(),
+        'wind': ws_madrid.sfcWind[hour,:,:].values.flatten(),
+        'hour': [hour for i in range(shape_city*shape_city)],
+        'month': [9 for i in range(shape_city*shape_city)],
+        'isrural' : urban_mask_m.ruralurbanmask[:,:].values.flatten(),
+        'latitude' : np.array([latitudes[city] for i in range(shape_city*shape_city)]).flatten(),
+        'iswater' : land_sea_madrid.landseamask[:,:].values.flatten(),
+        'deltaT' : deltaT.flatten()
+        })
+    
+    q1 = np.sort(quantiles)[0]
+    q2 = np.sort(quantiles)[1]
+    q3 = np.sort(quantiles)[2]
+    madrid_df['pop_cat'] = madrid_df['pop'].apply(lambda x : 0 if x<100 else (1 if x<1000 else (2 if x<10000 else 3)))
+    madrid_df['deltaT_cat'] = madrid_df['deltaT'].apply(lambda x : 0 if x<q1 else (1 if x<q2 else (2 if x<q3 else 3)))
+
+    madrid_df = madrid_df.fillna(0)
+
+    deltaT_predicted = model.predict(madrid_df[['pop', 'elevation', 'land cover type', 'hum', 'wind', 'hour','month', 'NDVI', 'pop_cat', 'temp', 'latitude', 'deltaT_cat']])
+
+    '''deltaT_predicted[madrid_df['isrural']==1] = np.nan
+    deltaT[madrid_df['isrural']==1] = np.nan'''
+    deltaT_predicted[madrid_df['iswater']==0] = np.nan
+    deltaT[madrid_df['iswater']==0] = np.nan
+
+    #check the number of nan values
+
+    print('Number of nan values in deltaT: ', np.isnan(deltaT).sum())
+    print('Number of nan values in deltaT_predicted: ', np.isnan(deltaT_predicted).sum())
+    deltaT_predicted = deltaT_predicted.reshape(shape_city,shape_city)
+
+    vmin = deltaT[madrid_df['iswater']==1].min()
+    vmax = deltaT[madrid_df['iswater']==1].max()
+
+    fig,axs = plt.subplots(1,2, figsize=(10,5))
+    fig.suptitle(f'{city} real and predicted urban temperature delta, for the month of {month}, at the {hour%24} of the day\n Same color scale for both images')
+
+    im0 = axs[0].imshow(deltaT.reshape(shape_city,shape_city), vmin=vmin, vmax=vmax)
+    axs[0].set_title('True DeltaT')
+    axs[0].set_ylim(axs[0].get_ylim()[::-1])
+
+    #add a colorbar
+    fig.colorbar(im0, ax = axs[0])
+
+    im1 = axs[1].imshow(deltaT_predicted.reshape(shape_city,shape_city), vmin=vmin, vmax=vmax)
+    axs[1].set_ylim(axs[1].get_ylim()[::-1])
+    axs[1].set_title('Predicted DeltaT')
+
+    #add a colorbar
+    fig.colorbar(im1, ax = axs[1])
+
+    plt.show()
+
+    ################################################################
+
+    fig,axs = plt.subplots(1,2, figsize=(10,5))
+    fig.suptitle(f'{city} real and predicted urban temperature delta, for the month of {month}, at {hour%24}\n different color scale for each image')
+
+    im0 = axs[0].imshow(deltaT.reshape(shape_city,shape_city))
+    axs[0].set_title('True DeltaT')
+    axs[0].set_ylim(axs[0].get_ylim()[::-1])
+
+    #add a colorbar
+    fig.colorbar(im0, ax = axs[0])
+
+
+    im2 = axs[1].imshow(deltaT_predicted.reshape(shape_city,shape_city))
+    axs[1].set_ylim(axs[1].get_ylim()[::-1])
+    axs[1].set_title('Predicted DeltaT')
+
+    #add a colorbar
+    fig.colorbar(im2, ax = axs[1])
+    plt.show()
+
+
+
+
+
+
+
+
+

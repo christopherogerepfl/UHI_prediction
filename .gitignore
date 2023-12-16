@@ -428,3 +428,4 @@ elevation/elevation_merged.tif
 NDVI/c_gls_NDVI_201406110000_GLOBE_PROBAV_V2.2.1.nc
 data_lyon.csv
 exploratory.ipynb
+data_cities/city_df_interp.csv
