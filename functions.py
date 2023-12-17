@@ -285,7 +285,7 @@ def using_mpl_scatter_density(fig, x, y):
     fig.colorbar(density, label='Number of points per pixel')
 
 
-def visualization_prediction(city, hour, model, month, quantiles, cmap='jet'):
+def visualization_prediction(city, hour, model, month, quantiles, cmap='jet', deltaTcat=False):
 
     if city not in ['Amsterdam', 'Madrid', 'Stockholm', 'Lyon', 'Vienna']:
         raise ValueError('City not in the list\n Please choose between Amsterdam, Madrid, Stockholm, Lyon, Vienna')
@@ -358,22 +358,34 @@ def visualization_prediction(city, hour, model, month, quantiles, cmap='jet'):
     madrid_df['deltaT_cat'] = madrid_df['deltaT'].apply(lambda x : 0 if x<q1 else (1 if x<q2 else (2 if x<q3 else 3)))
 
     madrid_df = madrid_df.fillna(0)
-
-    deltaT_predicted = model.predict(madrid_df[['pop', 'elevation', 'land cover type', 'hum', 'wind', 'hour','month', 'NDVI', 'pop_cat', 'temp', 'latitude', 'deltaT_cat']])
+    if deltaTcat:
+        deltaT_predicted = model.predict(madrid_df[['pop', 'elevation', 'land cover type', 'hum', 'wind', 'hour','month', 'NDVI', 'temp', 'latitude', 'deltaT_cat']])
+    else:
+        deltaT_predicted = model.predict(madrid_df[['pop', 'elevation', 'land cover type', 'hum', 'wind', 'hour','month', 'NDVI', 'temp', 'latitude']])
 
     '''deltaT_predicted[madrid_df['isrural']==1] = np.nan
     deltaT[madrid_df['isrural']==1] = np.nan'''
     deltaT_predicted[madrid_df['iswater']==0] = np.nan
     deltaT[madrid_df['iswater']==0] = np.nan
+    deltaT_predicted[madrid_df['isrural']==1] = np.nan
+    deltaT[madrid_df['isrural']==1] = np.nan
 
     #check the number of nan values
 
     print('Number of nan values in deltaT: ', np.isnan(deltaT).sum())
     print('Number of nan values in deltaT_predicted: ', np.isnan(deltaT_predicted).sum())
-    deltaT_predicted = deltaT_predicted.reshape(shape_city,shape_city)
 
-    vmin = deltaT[madrid_df['iswater']==1].min()
-    vmax = deltaT[madrid_df['iswater']==1].max()
+    #check if the pixels are correspondant
+
+
+    vmin = np.min([deltaT[(madrid_df['iswater']==1) & (madrid_df['isrural']==0)].min(), 
+                   deltaT_predicted[(madrid_df['iswater']==1) & (madrid_df['isrural']==0)].min()])
+    vmax = np.max([deltaT[(madrid_df['iswater']==1) & (madrid_df['isrural']==0)].max(), 
+                   deltaT_predicted[(madrid_df['iswater']==1) & (madrid_df['isrural']==0)].max()])
+
+    deltaT_predicted = deltaT_predicted.reshape(shape_city,shape_city)
+    deltaT = deltaT.reshape(shape_city,shape_city)
+
 
     fig,axs = plt.subplots(1,2, figsize=(10,5))
     fig.suptitle(f'{city} real and predicted urban temperature delta, for the month of {month}, at the {hour%24} of the day\n Same color scale for both images')
@@ -414,6 +426,8 @@ def visualization_prediction(city, hour, model, month, quantiles, cmap='jet'):
     #add a colorbar
     fig.colorbar(im2, ax = axs[1])
     plt.show()
+
+    return deltaT, deltaT_predicted, madrid_df
 
 
 
