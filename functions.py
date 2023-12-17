@@ -230,5 +230,7 @@ def resample_image(image_to_resample, new_dimensions):
 
 def using_mpl_scatter_density(fig, x, y):
     ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
-    density = ax.scatter_density(x, y, cmap=white_viridis)
+    ax.set_xlim(0, 2000)
+    ax.set_ylim(0, 2000)
+    density = ax.scatter_density(x, y, cmap=white_viridis, norm=ViridisNormalization())
     fig.colorbar(density, label='Number of points per pixel')
