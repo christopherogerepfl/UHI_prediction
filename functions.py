@@ -180,7 +180,7 @@ def plot_avg_deltaT(folder_path):
     plt.show()
 
 
-def process_data_city(folder_path, pop_day, pop_night, elevation, lc, number_of_sample_per_city, city):
+def process_data_city(folder_path, pop_day, pop_night, elevation, lc, number_of_sample_per_city, city, cmap='jet'):
     '''Create a dataframe with, for each city, the temperature, the population, the wind speed, the humidity and compute the delta of
     temperature between urban and rural areas and add it to the dataframe'''
     city_df = pd.DataFrame(columns=['temp', 'pop', 'wind', 'hum', 'deltaT', 'hour','city'])
@@ -285,7 +285,7 @@ def using_mpl_scatter_density(fig, x, y):
     fig.colorbar(density, label='Number of points per pixel')
 
 
-def visualization_prediction(city, hour, model, month, quantiles):
+def visualization_prediction(city, hour, model, month, quantiles, cmap='jet'):
 
     if city not in ['Amsterdam', 'Madrid', 'Stockholm', 'Lyon', 'Vienna']:
         raise ValueError('City not in the list\n Please choose between Amsterdam, Madrid, Stockholm, Lyon, Vienna')
@@ -378,14 +378,14 @@ def visualization_prediction(city, hour, model, month, quantiles):
     fig,axs = plt.subplots(1,2, figsize=(10,5))
     fig.suptitle(f'{city} real and predicted urban temperature delta, for the month of {month}, at the {hour%24} of the day\n Same color scale for both images')
 
-    im0 = axs[0].imshow(deltaT.reshape(shape_city,shape_city), vmin=vmin, vmax=vmax)
+    im0 = axs[0].imshow(deltaT.reshape(shape_city,shape_city), vmin=vmin, vmax=vmax, cmap=cmap)
     axs[0].set_title('True DeltaT')
     axs[0].set_ylim(axs[0].get_ylim()[::-1])
 
     #add a colorbar
     fig.colorbar(im0, ax = axs[0])
 
-    im1 = axs[1].imshow(deltaT_predicted.reshape(shape_city,shape_city), vmin=vmin, vmax=vmax)
+    im1 = axs[1].imshow(deltaT_predicted.reshape(shape_city,shape_city), vmin=vmin, vmax=vmax, cmap=cmap)
     axs[1].set_ylim(axs[1].get_ylim()[::-1])
     axs[1].set_title('Predicted DeltaT')
 
@@ -399,7 +399,7 @@ def visualization_prediction(city, hour, model, month, quantiles):
     fig,axs = plt.subplots(1,2, figsize=(10,5))
     fig.suptitle(f'{city} real and predicted urban temperature delta, for the month of {month}, at {hour%24}\n different color scale for each image')
 
-    im0 = axs[0].imshow(deltaT.reshape(shape_city,shape_city))
+    im0 = axs[0].imshow(deltaT.reshape(shape_city,shape_city), cmap=cmap)
     axs[0].set_title('True DeltaT')
     axs[0].set_ylim(axs[0].get_ylim()[::-1])
 
@@ -407,7 +407,7 @@ def visualization_prediction(city, hour, model, month, quantiles):
     fig.colorbar(im0, ax = axs[0])
 
 
-    im2 = axs[1].imshow(deltaT_predicted.reshape(shape_city,shape_city))
+    im2 = axs[1].imshow(deltaT_predicted.reshape(shape_city,shape_city), cmap=cmap)
     axs[1].set_ylim(axs[1].get_ylim()[::-1])
     axs[1].set_title('Predicted DeltaT')
 
