@@ -355,13 +355,12 @@ def visualization_prediction(city, hour, model, month, quantiles, cmap='jet', de
     q2 = np.sort(quantiles)[1]
     q3 = np.sort(quantiles)[2]
     madrid_df['pop_cat'] = madrid_df['pop'].apply(lambda x : 0 if x<100 else (1 if x<1000 else (2 if x<10000 else 3)))
-    madrid_df['deltaT_cat'] = madrid_df['deltaT'].apply(lambda x : 0 if x<q1 else (1 if x<q2 else (2 if x<q3 else 3)))
-
+    madrid_df['deltaT_cat'] = madrid_df['deltaT'].apply(lambda x : 0 if x<=q1 else (1 if x<=q2 else (2 if x<=q3 else 3)))
     madrid_df = madrid_df.fillna(0)
     if deltaTcat:
-        deltaT_predicted = model.predict(madrid_df[['pop', 'elevation', 'land cover type', 'hum', 'wind', 'hour','month', 'NDVI', 'temp', 'latitude', 'deltaT_cat']])
+        deltaT_predicted = model.predict(madrid_df[['pop', 'elevation', 'land cover type', 'hum', 'wind', 'hour','month', 'NDVI','pop_cat', 'temp', 'latitude', 'deltaT_cat']])
     else:
-        deltaT_predicted = model.predict(madrid_df[['pop', 'elevation', 'land cover type', 'hum', 'wind', 'hour','month', 'NDVI', 'temp', 'latitude']])
+        deltaT_predicted = model.predict(madrid_df[['pop', 'elevation', 'land cover type', 'hum', 'wind', 'hour','month', 'NDVI','pop_cat', 'temp', 'latitude']])
 
     '''deltaT_predicted[madrid_df['isrural']==1] = np.nan
     deltaT[madrid_df['isrural']==1] = np.nan'''
@@ -427,7 +426,7 @@ def visualization_prediction(city, hour, model, month, quantiles, cmap='jet', de
     fig.colorbar(im2, ax = axs[1])
     plt.show()
 
-    return deltaT, deltaT_predicted, madrid_df
+    return deltaT, deltaT_predicted, madrid_df, shape_city
 
 
 
