@@ -24,4 +24,12 @@ In order to train the model, one need either to download the data for at least o
 This project uses several additional python librairies, with python 3.8+
 - Scikit-learn, Numpy, Pandas, Matplotlib, Tqdm, rasterio, Xarray, Pickle, mpl-scatter-density
 
-###
+### Data files
+
+The data files need to be separated in the following way :
+- data_population_day (containing all the files with the day population)
+- data_population_night
+- data_cities -> x_data -> files (where x is the name of the city)
+- NDVI (containing the NDVI files)
+- elevation (containing elevation files)
+- Land cover files with no folder
