@@ -1,19 +1,25 @@
-# Urban Heat Island Intensity Prediction
-## Introduction
-This project is dedicated to studying and predicting the Urban Heat Island (UHI) effect, a significant urban environmental issue where city areas experience higher temperatures than their rural counterparts. The UHI effect contributes to various challenges, including increased energy usage for cooling, worsening air quality, and heightened health risks due to elevated temperatures. Our approach involves a rigorous process of data collection, preprocessing, and application of machine learning ensemble models to understand and predict this phenomenon.
+# Urban Heat Island intensity prediction using ensemble regression methods
 
-## Table of Contents
-* [Getting Started](#getting-started)
-* [Usage](#usage)
-* [Models Implemented](#models-implemented)
+This machine learning project, part of the CS-433 Machine Learning course, aims to address the challenges posed by urban heat islands (UHIs) through predictive modeling. Urban heat islands refer to areas within cities that experience significantly higher temperatures than their surrounding rural areas, primarily due to human activities and the built environment.
 
-## Getting Started
-### Prerequisites
-- Python 3.8+
-- Libraries: numpy, matplotlib, pandas, seaborn, rasterio, netCDF4, tqdm
-  
-## Usage
-- Clone the Repository: Clone this repository to your local machine using the following command:
-git clone https://github.com/christopherogerepfl/UHI_prediction.git
+## Overview
 
-## Models Implemented
+In recent years, the effects of UHIs on both the environment and public health have become increasingly apparent. Rising temperatures, intensified energy consumption, and compromised air quality contribute to a multitude of issues, affecting the well-being of urban residents and exacerbating climate change. Our project leverages the power of machine learning to predict and understand the spatial distribution of urban heat islands, enabling measures for urban planning and climate resilience.
+
+## Key objectives
+1. Predict the temperature delta between urban and rural areas
+2. Predict accurately the population based on the delta of temperature
+
+## Getting started
+
+The two objectives are separated in two notebooks (task1.ipynb and task2.ipynb), and the main functions used are in the functions.py file. In order to train the model, we gathered data from several sources : 
+- Temperature, relative humidity, wind speed, rural urban mask, land sea mask come from the [Copernicus research program](https://cds.climate.copernicus.eu/cdsapp#!/dataset/sis-urban-climate-cities%3Ftab=overview?tab=doc)
+- NDVI and land cover type come from NASA [EARTHDATA program](https://appeears.earthdatacloud.nasa.gov/task/area)
+- The population come from a dataset made by the [Joint Research Center](https://data.jrc.ec.europa.eu/dataset/be02937c-5a08-4732-a24a-03e0a48bdcda#dataaccess) of the European Union
+
+In order to train the model, one need either to download the data for at least one European city, or, on demand, a csv file can be sent with around 2 millions samples for 5 European cities (Lyon, Madrid, Amsterdam, Vienna and Stockholm). A trained model (finalized_model.sav) can be found in the repo. It is the model with the best performances we obtained.
+
+### Librairies to install
+
+This project uses several additional python librairies, with python 3.8+
+- Scikit-learn, Numpy, Pandas, Matplotlib, Tqdm, rasterio, Xarray, Pickle, mpl-scatter-density
