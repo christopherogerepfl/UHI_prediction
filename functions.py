@@ -283,7 +283,7 @@ def using_mpl_scatter_density(fig, x, y):
     ax = fig.add_subplot(1, 1, 1, projection='scatter_density')
     ax.set_xlim(0, 2000)
     ax.set_ylim(0, 2000)
-    density = ax.scatter_density(x, y, cmap=white_viridis, norm=ViridisNormalization())
+    density = ax.scatter_density(x, y, cmap=white_viridis)
     fig.colorbar(density, label='Number of points per pixel')
 
 
@@ -362,7 +362,7 @@ def visualization_prediction(city, hour, model, month, quantiles, cmap='jet', de
     if deltaTcat:
         deltaT_predicted = model.predict(madrid_df[['pop', 'elevation', 'land cover type', 'hum', 'wind', 'hour','month', 'NDVI','pop_cat', 'temp', 'latitude', 'deltaT_cat']])
     else:
-        deltaT_predicted = model.predict(madrid_df[['pop', 'elevation', 'land cover type', 'hum', 'wind', 'hour','month', 'NDVI','pop_cat', 'temp', 'latitude']])
+        deltaT_predicted = model.predict(madrid_df[['pop', 'elevation', 'land cover type', 'hum', 'wind','month','hour', 'NDVI','pop_cat', 'temp', 'latitude']])
 
     '''deltaT_predicted[madrid_df['isrural']==1] = np.nan
     deltaT[madrid_df['isrural']==1] = np.nan'''
