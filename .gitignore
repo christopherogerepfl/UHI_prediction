@@ -429,3 +429,8 @@ NDVI/c_gls_NDVI_201406110000_GLOBE_PROBAV_V2.2.1.nc
 data_lyon.csv
 exploratory.ipynb
 data_cities/city_df_interp.csv
+MCD12Q1.061_LC_Prop1_doy2011001_aid0001.tif
+elevation/30N000E_20101117_gmted_mea300.tif
+elevation/30N030W_20101117_gmted_mea300.tif
+elevation/50N000E_20101117_gmted_mea300.tif
+elevation/50N030W_20101117_gmted_mea300.tif
