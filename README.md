@@ -17,7 +17,7 @@ The two objectives are separated in two notebooks (task1.ipynb and task2.ipynb),
 - NDVI and land cover type come from NASA [EARTHDATA program](https://appeears.earthdatacloud.nasa.gov/task/area)
 - The population come from a dataset made by the [Joint Research Center](https://data.jrc.ec.europa.eu/dataset/be02937c-5a08-4732-a24a-03e0a48bdcda#dataaccess) of the European Union
 
-In order to train the model, one need either to download the data for at least one European city, or, on demand, a csv file can be sent with around 2 millions samples for 5 European cities (Lyon, Madrid, Amsterdam, Vienna and Stockholm). Trained models (finalized_model.sav and gb_model.pk1) can be found in the repo. It is the model with the best performances we obtained.
+In order to train the model, one need either to download the data for at least one European city, or, on demand, a csv file can be sent with around 2 millions samples for 5 European cities (Lyon, Madrid, Amsterdam, Vienna and Stockholm). The csv model can be found at this url: \https://enacshare.epfl.ch/dVvwuPcAkSdoUqEr3T4ZC until the 21.02.23. Trained models (finalized_model.sav and gb_model.pk1) can be found in the repo. It is the model with the best performances we obtained.
 
 ### Librairies to install
 
